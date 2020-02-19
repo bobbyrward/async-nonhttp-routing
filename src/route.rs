@@ -10,29 +10,6 @@ pub enum FieldValue {
     Exact(u32),
 }
 
-pub struct FieldMatchBuilder<'a, Req, Resp> {
-    builder: RouteBuilder<'a, Req, Resp>,
-    index: u32,
-}
-
-impl<'a, Req, Resp> FieldMatchBuilder<'a, Req, Resp> {
-    pub(crate) fn new(builder: RouteBuilder<'a, Req, Resp>, index: u32) -> Self {
-        Self { builder, index }
-    }
-
-    pub fn exact(mut self, value: u32) -> RouteBuilder<'a, Req, Resp> {
-        self.builder
-            .fields
-            .insert(self.index, FieldValue::Exact(value));
-        self.builder
-    }
-
-    pub fn exists(mut self) -> RouteBuilder<'a, Req, Resp> {
-        self.builder.fields.insert(self.index, FieldValue::Any);
-        self.builder
-    }
-}
-
 pub struct RouteBuilder<'a, Req, Resp> {
     mti: u32,
     fields: HashMap<u32, FieldValue>,
@@ -51,8 +28,9 @@ where
         }
     }
 
-    pub fn field(self, index: u32) -> FieldMatchBuilder<'a, Req, Resp> {
-        FieldMatchBuilder::new(self, index)
+    pub fn field(mut self, index: u32, value: FieldValue) -> Self {
+        self.fields.insert(index, value);
+        self
     }
 
     pub fn build<HFn>(self, handler: HFn)
