@@ -26,3 +26,5 @@ where
 }
 
 pub type HandlerFuture<T> = Pin<Box<dyn Future<Output = Result<T>>>>;
+pub type HandlerBox<Req, Resp> = Box<dyn HandlerFn<Req, Future = HandlerFuture<Resp>>>;
+

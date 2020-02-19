@@ -1,15 +1,36 @@
-use crate::handler::{HandlerFn, HandlerFuture};
+use crate::handler::{HandlerBox, HandlerFn, HandlerFuture};
 use crate::request::Request;
 use crate::router::Router;
 use std::collections::HashMap;
-
-pub type HandlerBox<Req, Resp> = Box<dyn HandlerFn<Req, Future = HandlerFuture<Resp>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FieldValue {
     #[allow(dead_code)]
     Any,
     Exact(u32),
+}
+
+pub struct FieldMatchBuilder<'a, Req, Resp> {
+    builder: RouteBuilder<'a, Req, Resp>,
+    index: u32,
+}
+
+impl<'a, Req, Resp> FieldMatchBuilder<'a, Req, Resp> {
+    pub(crate) fn new(builder: RouteBuilder<'a, Req, Resp>, index: u32) -> Self {
+        Self { builder, index }
+    }
+
+    pub fn exact(mut self, value: u32) -> RouteBuilder<'a, Req, Resp> {
+        self.builder
+            .fields
+            .insert(self.index, FieldValue::Exact(value));
+        self.builder
+    }
+
+    pub fn exists(mut self) -> RouteBuilder<'a, Req, Resp> {
+        self.builder.fields.insert(self.index, FieldValue::Any);
+        self.builder
+    }
 }
 
 pub struct RouteBuilder<'a, Req, Resp> {
@@ -30,9 +51,8 @@ where
         }
     }
 
-    pub fn field(mut self, index: u32, value: u32) -> Self {
-        self.fields.insert(index, FieldValue::Exact(value));
-        self
+    pub fn field(self, index: u32) -> FieldMatchBuilder<'a, Req, Resp> {
+        FieldMatchBuilder::new(self, index)
     }
 
     pub fn build<HFn>(self, handler: HFn)
@@ -80,7 +100,7 @@ where
             return false;
         }
 
-        for (k, expected_value) in self.fields.iter() {
+        self.fields.iter().all(|(k, expected_value)| {
             let actual_value = request.fields().get(k);
 
             let actual_value = match expected_value {
@@ -88,15 +108,11 @@ where
                 FieldValue::Exact(value) => actual_value.map(|v| *value == *v),
             };
 
-            if !actual_value.unwrap_or(false) {
-                return false;
-            }
-        }
-
-        true
+            actual_value.unwrap_or(false)
+        })
     }
 
-    pub fn call(&self, request: Req) -> HandlerFuture<Resp> {
-        self.handler.call(request)
+    pub(crate) fn handler(&self) -> &HandlerBox<Req, Resp> {
+        &self.handler
     }
 }
