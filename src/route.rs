@@ -1,7 +1,9 @@
-use crate::handler::{HandlerBox, HandlerFn, HandlerFuture};
+use crate::handler::{HandlerBox, HandlerFuture};
 use crate::request::Request;
 use crate::router::Router;
+use anyhow::Result;
 use std::collections::HashMap;
+use std::future::Future;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FieldValue {
@@ -33,12 +35,16 @@ where
         self
     }
 
-    pub fn build<HFn>(self, handler: HFn)
+    pub fn build<HFn, F>(self, handler: HFn)
     where
-        HFn: HandlerFn<Req, Future = HandlerFuture<Resp>> + 'static,
+        HFn: Fn(Req) -> F + 'static,
+        F: Future<Output = Result<Resp>> + 'static,
     {
-        self.router
-            .insert_route(Route::new(self.mti, self.fields, Box::new(handler)));
+        self.router.insert_route(Route::new(
+            self.mti,
+            self.fields,
+            Box::new(move |req| -> HandlerFuture<Resp> { Box::pin(handler(req)) }),
+        ));
     }
 }
 

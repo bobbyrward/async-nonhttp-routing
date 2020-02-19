@@ -1,8 +1,9 @@
-use crate::handler::{HandlerBox, HandlerFn, HandlerFuture};
+use crate::handler::{HandlerBox, HandlerFuture};
 use crate::request::Request;
 use crate::route::{Route, RouteBuilder};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
+use std::future::Future;
 
 /// The request router
 ///
@@ -23,15 +24,18 @@ where
         }
     }
 
-    pub fn route(&mut self, code: u32) -> RouteBuilder<'_, Req, Resp> {
-        RouteBuilder::new(self, code)
+    pub fn default<HFn, F>(&mut self, handler: HFn)
+    where
+        HFn: Fn(Req) -> F + 'static,
+        F: Future<Output = Result<Resp>> + 'static,
+    {
+        self.default = Some(Box::new(move |req| -> HandlerFuture<Resp> {
+            Box::pin(handler(req))
+        }));
     }
 
-    pub fn default<HFn>(&mut self, handler: HFn)
-    where
-        HFn: HandlerFn<Req, Future = HandlerFuture<Resp>> + 'static,
-    {
-        self.default = Some(Box::new(handler));
+    pub fn route(&mut self, code: u32) -> RouteBuilder<'_, Req, Resp> {
+        RouteBuilder::new(self, code)
     }
 
     pub(crate) fn insert_route(&mut self, route: Route<Req, Resp>) {

@@ -6,7 +6,7 @@ mod router;
 
 use anyhow::Result;
 use request::TestRequest;
-use response::{Response, ResponseFuture};
+use response::Response;
 use route::FieldValue;
 use router::Router;
 
@@ -35,8 +35,6 @@ async fn handle_default(request: TestRequest) -> Result<Response> {
     Ok(Response {})
 }
 
-// struct TestContext;
-
 /// Main
 ///
 ///
@@ -44,7 +42,7 @@ async fn handle_default(request: TestRequest) -> Result<Response> {
 async fn main() -> Result<()> {
     let mut router: Router<TestRequest, Response> = Router::new();
 
-    router.default(|request| -> ResponseFuture { Box::pin(handle_default(request)) });
+    router.default(handle_default);
 
     router
         .route(1)
@@ -53,26 +51,20 @@ async fn main() -> Result<()> {
         .field(3, FieldValue::Exact(1231))
         .field(7, FieldValue::Exact(212_312))
         .field(10, FieldValue::Exact(208))
-        .build(|request| -> ResponseFuture { Box::pin(handle_one_field_one_is_two(request)) });
+        .build(handle_one_field_one_is_two);
 
     router
         .route(1)
         .field(1, FieldValue::Exact(2))
-        .build(|request| -> ResponseFuture { Box::pin(handle_one_field_one_is_two(request)) });
+        .build(handle_one_field_one_is_two);
 
-    #[rustfmt::skip]
     router
         .route(1)
         .field(2, FieldValue::Any)
-        .build(|request| -> ResponseFuture { Box::pin(handle_one_field_two_exists(request)) });
+        .build(handle_one_field_two_exists);
 
-    router
-        .route(2)
-        .build(|request| -> ResponseFuture { Box::pin(handle_two(request)) });
-
-    router
-        .route(3)
-        .build(|request| -> ResponseFuture { Box::pin(handle_three(request)) });
+    router.route(2).build(handle_two);
+    router.route(3).build(handle_three);
 
     router.request(TestRequest::new(1))?.await?;
     router

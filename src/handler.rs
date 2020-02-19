@@ -1,4 +1,3 @@
-use crate::{request::TestRequest, response::ResponseFuture};
 use anyhow::Result;
 use std::{future::Future, pin::Pin};
 
@@ -14,17 +13,16 @@ pub trait HandlerFn<R> {
 /// Impl HandlerFn for closures
 ///
 ///
-impl<F> HandlerFn<TestRequest> for F
+impl<F, Req, Resp> HandlerFn<Req> for F
 where
-    F: Fn(TestRequest) -> ResponseFuture,
+    F: Fn(Req) -> HandlerFuture<Resp>,
 {
-    type Future = ResponseFuture;
+    type Future = HandlerFuture<Resp>;
 
-    fn call(&self, request: TestRequest) -> ResponseFuture {
+    fn call(&self, request: Req) -> HandlerFuture<Resp> {
         self(request)
     }
 }
 
 pub type HandlerFuture<T> = Pin<Box<dyn Future<Output = Result<T>>>>;
 pub type HandlerBox<Req, Resp> = Box<dyn HandlerFn<Req, Future = HandlerFuture<Resp>>>;
-
